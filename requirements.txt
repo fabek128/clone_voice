@@ -1,0 +1,6 @@
+qwen-tts>=0.0.5
+soundfile>=0.12.1
+numpy>=1.23
+huggingface_hub>=0.20
+pedalboard
+pydub

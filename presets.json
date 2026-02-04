@@ -1,0 +1,14 @@
+[
+  {
+    "name": "Demo neutral",
+    "text": "Hola, esta es una prueba de clonacion de voz."
+  },
+  {
+    "name": "Demo corto",
+    "text": "Prueba corta de voz."
+  },
+  {
+    "name": "Demo largo",
+    "text": "En este experimento vamos a evaluar claridad, ritmo y entonacion."
+  }
+]

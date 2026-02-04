@@ -24,3 +24,11 @@ data/outputs/*
 *.safetensors
 *.pt
 *.bin
+
+# Env files
+.env
+.env.*
+
+# Output audio (explicit)
+data/outputs/*.wav
+data/outputs/*.mp3

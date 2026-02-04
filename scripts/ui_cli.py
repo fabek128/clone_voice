@@ -75,13 +75,14 @@ def build_fx_args() -> list[str]:
         "Reverb",
         "Echo",
         "Broadcast (compress/limit)",
+        "Clean (filter/comp)",
         "Custom",
     ]
     idx = choose_option("FX preset", options)
     if idx == 0:
         return []
 
-    if idx == 5:
+    if idx == 6:
         args: list[str] = []
         pitch = prompt_str("Pitch semitones (e.g. -2)")
         if pitch:
@@ -115,7 +116,7 @@ def build_fx_args() -> list[str]:
             args += ["--normalize"]
         return args
 
-    preset_map = {1: "thick", 2: "reverb", 3: "echo", 4: "broadcast"}
+    preset_map = {1: "thick", 2: "reverb", 3: "echo", 4: "broadcast", 5: "clean"}
     args = ["--preset", preset_map[idx]]
     if prompt_yes_no("Normalize output", default=False):
         args += ["--normalize"]

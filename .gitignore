@@ -32,3 +32,6 @@ data/outputs/*
 # Output audio (explicit)
 data/outputs/*.wav
 data/outputs/*.mp3
+
+# Task history
+data/history.jsonl

@@ -43,6 +43,27 @@ python scripts/ui_cli.py
 
 Incluye presets de texto en `presets.json`.
 
+## Web UI (frontend simple)
+
+La app web permite subir audio, definir transcript, configurar parametros, correr tareas en background y ver estados en tiempo real (SSE).
+
+### Levantar en local (backend + frontend juntos)
+1. Crear y activar entorno:
+   - `python -m venv .venv`
+   - `.\.venv\Scripts\Activate.ps1`
+2. Instalar dependencias:
+   - `pip install -r requirements.txt`
+3. Levantar servidor:
+   - `python app/server.py`
+4. Abrir en el navegador:
+   - `http://127.0.0.1:8000`
+
+El backend sirve el frontend estatico desde `web/`, y los outputs desde `/outputs/`.
+
+Notas:
+- Requiere `ffmpeg` en PATH para exportar mp3 o procesar mp3/m4a.
+- Los outputs se sirven desde `/outputs/`.
+
 ## Uso basico (clonacion)
 Ejemplo con audio local y transcript:
 

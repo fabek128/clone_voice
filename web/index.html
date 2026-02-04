@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Qwen3-TTS Manager</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div>
+          <div class="eyebrow">Qwen3-TTS Manager</div>
+          <h1>Voice Cloning Dashboard</h1>
+          <p class="subtitle">
+            Upload reference audio, add transcript, generate, and optionally apply FX. Tasks run in the
+            background with live status updates.
+          </p>
+        </div>
+        <div class="live-indicator" id="liveIndicator">
+          <span class="dot"></span>
+          Live updates
+        </div>
+      </header>
+
+      <main class="grid">
+        <section class="card">
+          <h2>Clone Voice</h2>
+          <form id="cloneForm">
+            <div class="field">
+              <label>Reference audio</label>
+              <input type="file" name="ref_audio" accept=".wav,.mp3,.m4a,.flac,.ogg" required />
+            </div>
+            <div class="field">
+              <label>Reference transcript (optional if x-vector only)</label>
+              <textarea name="ref_text" rows="2" placeholder="Exact transcript for the reference audio"></textarea>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Mode</label>
+                <select name="mode" id="modeSelect">
+                  <option value="single">Single</option>
+                  <option value="batch">Batch</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Language</label>
+                <input type="text" name="language" placeholder="Spanish" />
+              </div>
+            </div>
+            <div class="field" id="singleTextField">
+              <label>Text</label>
+              <textarea name="text" rows="3" placeholder="Text to synthesize"></textarea>
+            </div>
+            <div class="field hidden" id="batchTextField">
+              <label>Batch lines (one per line)</label>
+              <textarea name="texts" rows="6" placeholder="Line 1&#10;Line 2&#10;Line 3"></textarea>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label>Model</label>
+                <input type="text" name="model" />
+              </div>
+              <div class="field">
+                <label>Device</label>
+                <select name="device">
+                  <option value="auto">auto</option>
+                  <option value="cuda:0">cuda:0</option>
+                  <option value="cuda:1">cuda:1</option>
+                  <option value="cpu">cpu</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label>Dtype</label>
+                <select name="dtype">
+                  <option value="auto">auto</option>
+                  <option value="bfloat16">bfloat16</option>
+                  <option value="float16">float16</option>
+                  <option value="float32">float32</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Attention</label>
+                <select name="attn">
+                  <option value="auto">auto</option>
+                  <option value="flash_attention_2">flash_attention_2</option>
+                  <option value="sdpa">sdpa</option>
+                  <option value="eager">eager</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="row">
+              <div class="field">
+                <label>Output format</label>
+                <select name="output_format">
+                  <option value="wav">wav</option>
+                  <option value="mp3">mp3</option>
+                </select>
+              </div>
+              <div class="field checkbox">
+                <label>
+                  <input type="checkbox" name="x_vector_only" />
+                  Use x-vector only (no transcript)
+                </label>
+              </div>
+            </div>
+
+            <div class="field">
+              <label>Extra kwargs (JSON)</label>
+              <textarea
+                name="extra_kwargs"
+                rows="2"
+                placeholder='{"temperature": 0.7, "top_k": 50}'
+              ></textarea>
+            </div>
+
+            <div class="divider"></div>
+
+            <div class="row">
+              <div class="field checkbox">
+                <label>
+                  <input type="checkbox" name="apply_fx" id="applyFxToggle" />
+                  Apply FX after clone
+                </label>
+              </div>
+              <div class="field">
+                <label>Batch chunk size</label>
+                <input type="number" name="chunk_size" min="1" value="8" />
+              </div>
+            </div>
+
+            <div id="fxOptions" class="fx-panel hidden">
+              <div class="row">
+                <div class="field">
+                  <label>FX preset</label>
+                  <select name="fx_preset">
+                    <option value="none">none</option>
+                    <option value="thick">thick</option>
+                    <option value="reverb">reverb</option>
+                    <option value="echo">echo</option>
+                    <option value="broadcast">broadcast</option>
+                    <option value="clean">clean</option>
+                  </select>
+                </div>
+                <div class="field checkbox">
+                  <label>
+                    <input type="checkbox" name="fx_normalize" />
+                    Normalize
+                  </label>
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="field">
+                  <label>Pitch (semitones)</label>
+                  <input type="number" step="0.1" name="fx_pitch" placeholder="-2" />
+                </div>
+                <div class="field">
+                  <label>Gain (dB)</label>
+                  <input type="number" step="0.1" name="fx_gain_db" placeholder="2" />
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="field">
+                  <label>Reverb (0-1)</label>
+                  <input type="number" step="0.05" name="fx_reverb" placeholder="0.5" />
+                </div>
+                <div class="field">
+                  <label>Echo delay (ms)</label>
+                  <input type="number" step="10" name="fx_echo_ms" placeholder="220" />
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="field">
+                  <label>Echo feedback (0-1)</label>
+                  <input type="number" step="0.05" name="fx_echo_feedback" placeholder="0.35" />
+                </div>
+                <div class="field">
+                  <label>Echo mix (0-1)</label>
+                  <input type="number" step="0.05" name="fx_echo_mix" placeholder="0.25" />
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="field">
+                  <label>Distortion (dB)</label>
+                  <input type="number" step="0.5" name="fx_distortion" placeholder="4" />
+                </div>
+                <div class="field">
+                  <label>Highpass (Hz)</label>
+                  <input type="number" step="10" name="fx_highpass_hz" placeholder="80" />
+                </div>
+              </div>
+
+              <div class="row">
+                <div class="field">
+                  <label>Lowpass (Hz)</label>
+                  <input type="number" step="100" name="fx_lowpass_hz" placeholder="12000" />
+                </div>
+                <div class="field checkbox">
+                  <label>
+                    <input type="checkbox" name="fx_compress" />
+                    Compressor
+                  </label>
+                </div>
+                <div class="field checkbox">
+                  <label>
+                    <input type="checkbox" name="fx_limit" />
+                    Limiter
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <button class="primary" type="submit">Start clone</button>
+            <div class="form-note" id="cloneStatus"></div>
+          </form>
+        </section>
+
+        <section class="card">
+          <h2>Apply FX to File</h2>
+          <form id="fxForm">
+            <div class="field">
+              <label>Input audio</label>
+              <input type="file" name="input_audio" accept=".wav,.mp3,.m4a,.flac,.ogg" required />
+            </div>
+            <div class="field">
+              <label>Preset</label>
+              <select name="fx_preset">
+                <option value="none">none</option>
+                <option value="thick">thick</option>
+                <option value="reverb">reverb</option>
+                <option value="echo">echo</option>
+                <option value="broadcast">broadcast</option>
+                <option value="clean">clean</option>
+              </select>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Pitch (semitones)</label>
+                <input type="number" step="0.1" name="fx_pitch" placeholder="-2" />
+              </div>
+              <div class="field">
+                <label>Gain (dB)</label>
+                <input type="number" step="0.1" name="fx_gain_db" placeholder="2" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Reverb (0-1)</label>
+                <input type="number" step="0.05" name="fx_reverb" placeholder="0.5" />
+              </div>
+              <div class="field">
+                <label>Echo delay (ms)</label>
+                <input type="number" step="10" name="fx_echo_ms" placeholder="220" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Echo feedback (0-1)</label>
+                <input type="number" step="0.05" name="fx_echo_feedback" placeholder="0.35" />
+              </div>
+              <div class="field">
+                <label>Echo mix (0-1)</label>
+                <input type="number" step="0.05" name="fx_echo_mix" placeholder="0.25" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Distortion (dB)</label>
+                <input type="number" step="0.5" name="fx_distortion" placeholder="4" />
+              </div>
+              <div class="field">
+                <label>Highpass (Hz)</label>
+                <input type="number" step="10" name="fx_highpass_hz" placeholder="80" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label>Lowpass (Hz)</label>
+                <input type="number" step="100" name="fx_lowpass_hz" placeholder="12000" />
+              </div>
+              <div class="field checkbox">
+                <label>
+                  <input type="checkbox" name="fx_compress" />
+                  Compressor
+                </label>
+              </div>
+              <div class="field checkbox">
+                <label>
+                  <input type="checkbox" name="fx_limit" />
+                  Limiter
+                </label>
+              </div>
+            </div>
+            <div class="field checkbox">
+              <label>
+                <input type="checkbox" name="fx_normalize" />
+                Normalize
+              </label>
+            </div>
+
+            <button class="primary" type="submit">Apply FX</button>
+            <div class="form-note" id="fxStatus"></div>
+          </form>
+        </section>
+
+        <section class="card span-2">
+          <div class="tasks-header">
+            <div>
+              <h2>Tasks</h2>
+              <p class="subtitle">Queued, running, and completed jobs.</p>
+            </div>
+            <div class="task-summary" id="taskSummary">No tasks yet</div>
+          </div>
+          <div id="tasksList" class="tasks-list"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

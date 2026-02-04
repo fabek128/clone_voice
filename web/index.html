@@ -45,7 +45,18 @@
               </div>
               <div class="field">
                 <label>Language</label>
-                <input type="text" name="language" placeholder="Spanish" />
+                <select name="language">
+                  <option value="Spanish">Spanish</option>
+                  <option value="English">English</option>
+                  <option value="Portuguese">Portuguese</option>
+                  <option value="French">French</option>
+                  <option value="German">German</option>
+                  <option value="Italian">Italian</option>
+                  <option value="Japanese">Japanese</option>
+                  <option value="Korean">Korean</option>
+                  <option value="Chinese">Chinese</option>
+                  <option value="Auto">Auto</option>
+                </select>
               </div>
             </div>
             <div class="field" id="singleTextField">
@@ -55,6 +66,12 @@
             <div class="field hidden" id="batchTextField">
               <label>Batch lines (one per line)</label>
               <textarea name="texts" rows="6" placeholder="Line 1&#10;Line 2&#10;Line 3"></textarea>
+            </div>
+            <div class="field checkbox hidden" id="batchJoinField">
+              <label>
+                <input type="checkbox" name="join_outputs" id="joinOutputs" />
+                Unir batch en un solo WAV (sin perdida)
+              </label>
             </div>
 
             <div class="row">

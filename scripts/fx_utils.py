@@ -91,9 +91,16 @@ def apply_preset_defaults(config: FxConfig) -> None:
 
 
 def safe_effect(cls, **kwargs):
-    sig = inspect.signature(cls.__init__)
-    filtered = {k: v for k, v in kwargs.items() if k in sig.parameters and v is not None}
-    return cls(**filtered)
+    try:
+        sig = inspect.signature(cls.__init__)
+        filtered = {k: v for k, v in kwargs.items() if k in sig.parameters and v is not None}
+    except (ValueError, TypeError):
+        # Some pedalboard classes are C-extensions without inspectable signatures.
+        filtered = {k: v for k, v in kwargs.items() if v is not None}
+    try:
+        return cls(**filtered)
+    except Exception as exc:
+        raise TypeError(f"Failed to init {cls.__name__} with {filtered}: {exc}") from exc
 
 
 class AudioLoadError(SystemExit):

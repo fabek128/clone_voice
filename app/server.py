@@ -3,10 +3,12 @@ import json
 import queue
 import threading
 import time
+import traceback
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import numpy as np
 import soundfile as sf
 import torch
 from fastapi import FastAPI, File, Form, UploadFile
@@ -27,6 +29,7 @@ UPLOAD_DIR = DATA_DIR / "inputs" / "uploads"
 OUTPUT_DIR = DATA_DIR / "outputs"
 HISTORY_PATH = DATA_DIR / "history.jsonl"
 WEB_DIR = ROOT / "web"
+STALE_SECONDS = 20 * 60
 
 DEFAULTS = merge_config(load_config(str(ROOT / "config.json")))
 
@@ -107,7 +110,9 @@ class TaskManager:
         self.lock = threading.Lock()
         self.queue: "queue.Queue[tuple[str, Any]]" = queue.Queue()
         self.worker = threading.Thread(target=self._worker, daemon=True)
+        self.monitor = threading.Thread(target=self._monitor, daemon=True)
         self.worker.start()
+        self.monitor.start()
         self._load_history()
 
     def _load_history(self) -> None:
@@ -146,9 +151,11 @@ class TaskManager:
             "created_at": now_iso(),
             "started_at": None,
             "finished_at": None,
+            "updated_at": now_iso(),
             "params": params,
             "outputs": [],
             "error": None,
+            "error_detail": None,
         }
         with self.lock:
             self.tasks[task_id] = task
@@ -161,6 +168,7 @@ class TaskManager:
             task = self.tasks.get(task_id)
             if not task:
                 return
+            updates["updated_at"] = now_iso()
             task.update(updates)
 
     def snapshot(self) -> List[Dict[str, Any]]:
@@ -187,10 +195,30 @@ class TaskManager:
                     message="error",
                     finished_at=now_iso(),
                     error=str(exc),
+                    error_detail=traceback.format_exc(),
                 )
             task = self.tasks.get(task_id)
             if task:
                 self._append_history(task)
+
+    def _monitor(self) -> None:
+        while True:
+            time.sleep(15)
+            with self.lock:
+                for task in self.tasks.values():
+                    if task.get("status") != "running":
+                        continue
+                    updated_at = task.get("updated_at")
+                    if not updated_at:
+                        continue
+                    try:
+                        last = time.strptime(updated_at, "%Y-%m-%dT%H:%M:%S")
+                    except ValueError:
+                        continue
+                    elapsed = time.time() - time.mktime(last)
+                    if elapsed > STALE_SECONDS:
+                        task["status"] = "stalled"
+                        task["message"] = f"stalled > {STALE_SECONDS // 60}m"
 
 
 TASKS = TaskManager()
@@ -246,6 +274,7 @@ async def clone_voice(
     extra_kwargs: str | None = Form(None),
     chunk_size: int = Form(8),
     out_prefix: str = Form("line"),
+    join_outputs: str = Form("false"),
 ):
     ensure_dirs()
     suffix = safe_suffix(ref_audio.filename or "ref.wav")
@@ -265,6 +294,7 @@ async def clone_voice(
         "x_vector_only": parse_bool(x_vector_only),
         "output_format": output_format,
         "apply_fx": parse_bool(apply_fx),
+        "join_outputs": parse_bool(join_outputs),
     }
 
     def run(task_id: str, update):
@@ -313,6 +343,8 @@ async def clone_voice(
             items = [line.strip() for line in texts.splitlines() if line.strip()]
             if not items:
                 raise SystemExit("No valid batch lines provided.")
+            if parse_bool(join_outputs) and output_format.lower() != "wav":
+                raise SystemExit("Join outputs requires WAV to avoid quality loss. Set output_format=wav.")
 
             update(task_id, message="building voice clone prompt")
             prompt_items = model_obj.create_voice_clone_prompt(
@@ -320,6 +352,9 @@ async def clone_voice(
                 ref_text=ref_text_local,
                 x_vector_only_mode=parse_bool(x_vector_only),
             )
+
+            join_segments: List[np.ndarray] = []
+            join_sr: Optional[int] = None
 
             index = 1
             for batch in chunked(items, chunk_size):
@@ -336,7 +371,20 @@ async def clone_voice(
                     out_path = output_dir / out_name
                     write_audio(out_path, wav, sr)
                     outputs.append({"file": f"/outputs/{task_id}/{out_name}"})
+                    if parse_bool(join_outputs):
+                        join_segments.append(np.asarray(wav))
+                        join_sr = sr if join_sr is None else join_sr
+                        if join_sr != sr:
+                            raise SystemExit("Sample rate mismatch across batch outputs.")
                     index += 1
+
+            if parse_bool(join_outputs) and join_segments:
+                update(task_id, message="joining outputs")
+                joined_audio = np.concatenate([seg.reshape(-1) for seg in join_segments])
+                joined_name = f"{out_prefix}_joined.wav"
+                joined_path = output_dir / joined_name
+                write_audio(joined_path, joined_audio, join_sr or sr)
+                outputs.append({"file": f"/outputs/{task_id}/{joined_name}"})
         else:
             if not text:
                 raise SystemExit("Single mode requires text.")

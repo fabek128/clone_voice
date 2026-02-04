@@ -9,7 +9,7 @@ DEFAULT_CONFIG: Dict[str, Any] = {
     "device": "auto",
     "dtype": "auto",
     "attn": "auto",
-    "language": "Auto",
+    "language": "Spanish",
     "out": "data/outputs/clone.wav",
     "batch_out_dir": "data/outputs/batch",
     "batch_chunk_size": 8,

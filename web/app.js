@@ -10,6 +10,9 @@ const fxStatus = document.getElementById("fxStatus");
 const tasksList = document.getElementById("tasksList");
 const taskSummary = document.getElementById("taskSummary");
 const liveIndicator = document.getElementById("liveIndicator");
+const expandedTasks = new Set();
+const batchJoinField = document.getElementById("batchJoinField");
+const joinOutputs = document.getElementById("joinOutputs");
 
 function setStatus(el, text, tone = "info") {
   el.textContent = text;
@@ -20,6 +23,7 @@ function toggleMode() {
   const isBatch = modeSelect.value === "batch";
   singleTextField.classList.toggle("hidden", isBatch);
   batchTextField.classList.toggle("hidden", !isBatch);
+  batchJoinField.classList.toggle("hidden", !isBatch);
 }
 
 function toggleFxOptions() {
@@ -72,7 +76,7 @@ async function loadDefaults() {
     const data = await res.json();
     const defaults = data.defaults || {};
     cloneForm.model.value = defaults.model || "";
-    cloneForm.language.value = defaults.language || "Auto";
+    cloneForm.language.value = defaults.language || "Spanish";
     cloneForm.device.value = defaults.device || "auto";
     cloneForm.dtype.value = defaults.dtype || "auto";
     cloneForm.attn.value = defaults.attn || "auto";
@@ -90,6 +94,7 @@ cloneForm.addEventListener("submit", async (event) => {
   fd.set("mode", modeSelect.value);
   fd.set("x_vector_only", cloneForm.x_vector_only.checked ? "true" : "false");
   fd.set("apply_fx", applyFxToggle.checked ? "true" : "false");
+  fd.set("join_outputs", modeSelect.value === "batch" && joinOutputs.checked ? "true" : "false");
 
   const extraKw = cloneForm.extra_kwargs.value.trim();
   if (extraKw) {
@@ -167,6 +172,7 @@ function renderTasks(tasks) {
   tasks.forEach((task) => {
     const card = document.createElement("div");
     card.className = "task";
+    card.dataset.taskId = task.id;
 
     const header = document.createElement("div");
     header.className = "task-header";
@@ -206,11 +212,58 @@ function renderTasks(tasks) {
       card.appendChild(error);
     }
 
+    const details = document.createElement("div");
+    details.className = "task-details hidden";
+
+    const detailMeta = document.createElement("div");
+    detailMeta.className = "task-meta";
+    detailMeta.textContent = `started ${task.started_at || "-"} | updated ${task.updated_at || "-"} | finished ${
+      task.finished_at || "-"
+    }`;
+
+    const detailParams = document.createElement("pre");
+    detailParams.textContent = JSON.stringify(
+      {
+        params: task.params,
+        outputs: task.outputs,
+        error: task.error,
+        error_detail: task.error_detail,
+      },
+      null,
+      2
+    );
+
+    details.appendChild(detailMeta);
+    details.appendChild(detailParams);
+
     card.appendChild(header);
     card.appendChild(meta);
     if (files.childElementCount) {
       card.appendChild(files);
     }
+    card.appendChild(details);
+
+    card.addEventListener("click", (event) => {
+      if (event.target.tagName === "A") {
+        return;
+      }
+      const taskId = card.dataset.taskId;
+      if (expandedTasks.has(taskId)) {
+        expandedTasks.delete(taskId);
+        card.classList.remove("expanded");
+        details.classList.add("hidden");
+      } else {
+        expandedTasks.add(taskId);
+        card.classList.add("expanded");
+        details.classList.remove("hidden");
+      }
+    });
+
+    if (expandedTasks.has(task.id)) {
+      card.classList.add("expanded");
+      details.classList.remove("hidden");
+    }
+
     tasksList.appendChild(card);
   });
 }
